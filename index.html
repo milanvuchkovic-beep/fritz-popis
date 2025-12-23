@@ -141,35 +141,33 @@
         <h1>Fritz Popis</h1>
     </header>
 
-    <main>
+<main>
         <div class="card">
-            <h2>Unos stavke</h2>
+            <h2>Fritz Popis</h2>
             
             <div class="form-group">
                 <label for="lokacija">Lokacija:</label>
                 <select id="lokacija">
                     <option value="" disabled selected>-- Izaberi lokaciju --</option>
                     <option value="Magacin 1">Magacin 1</option>
-                    <option value="Magacin 2">Magacin 2</option>
                     <option value="Proizvodnja">Proizvodnja</option>
-                    <option value="Kancelarija">Kancelarija</option>
                     <option value="Dvorište">Dvorište</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="naziv">Šifra dela:</label>
-                <input type="text" id="naziv" placeholder="npr. P-00...">
+                <label for="kod">Skeniraj Kod:</label>
+                <input type="text" id="kod" placeholder="Skeniraj ovde..." autofocus>
             </div>
 
             <div class="form-group">
                 <label for="kolicina">Količina:</label>
-                <input type="number" id="kolicina" placeholder="0">
+                <input type="number" id="kolicina" placeholder="Ukucaj količinu">
             </div>
 
             <div class="form-group">
                 <label for="napomena">Napomena:</label>
-                <textarea id="napomena" rows="3" placeholder="Dodatni opis (opciono)..."></textarea>
+                <textarea id="napomena" rows="2" placeholder="Opciono..."></textarea>
             </div>
 
             <button class="btn-primary" onclick="saveData()">Sačuvaj Unos</button>
@@ -178,29 +176,62 @@
     </main>
 
     <script>
+        // Postavi kursor u polje KOD čim se stranica učita
+        window.onload = function() {
+            document.getElementById("kod").focus();
+        };
+
+        // Osluskivanje ENTER tastera
+        document.addEventListener('keydown', function(event) {
+            // Ako je pritisnut Enter
+            if (event.key === 'Enter') {
+                const aktivnoPolje = document.activeElement;
+
+                // 1. Ako smo bili u polju KOD -> Prebaci na Količinu
+                if (aktivnoPolje.id === 'kod') {
+                    event.preventDefault(); // Spreči da forma poludi
+                    document.getElementById('kolicina').focus();
+                }
+                // 2. Ako smo bili u polju KOLIČINA -> Sačuvaj podatke
+                else if (aktivnoPolje.id === 'kolicina') {
+                    event.preventDefault();
+                    saveData();
+                }
+            }
+        });
+
         async function saveData() {
-            // TVOJ STARI LINK (ne diraj ako si uradio update verzije u App Scriptu)
             const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8coit4C-MckbtGspSJ0QtMboldH0BrGzsAa5oknFyuQ1c_Grufk4S_zyfQ8xjGf0lOQ/exec'; 
 
             const lokacija = document.getElementById('lokacija').value;
-            const naziv = document.getElementById('naziv').value;
+            const kod = document.getElementById('kod').value; // Promenjeno u kod
             const kolicina = document.getElementById('kolicina').value;
             const napomena = document.getElementById('napomena').value;
 
-            // Provera da li su polja popunjena
-            if (!lokacija || !naziv || !kolicina) {
-                prikaziStatus("Molim vas izaberite lokaciju, naziv i količinu.", "error");
+            // Validacija
+            if (!lokacija) {
+                prikaziStatus("Izaberi lokaciju!", "error");
+                return;
+            }
+            if (!kod) {
+                prikaziStatus("Fali bar-kod!", "error");
+                document.getElementById('kod').focus();
+                return;
+            }
+            if (!kolicina) {
+                prikaziStatus("Unesi količinu!", "error");
+                document.getElementById('kolicina').focus();
                 return;
             }
 
             const podaci = {
                 lokacija: lokacija,
-                naziv: naziv,
+                naziv: kod, // Šaljemo kod kao 'naziv' da ne menjamo App Script
                 kolicina: kolicina,
                 napomena: napomena
             };
 
-            prikaziStatus("Šaljem podatke...", "success");
+            prikaziStatus("Šaljem...", "success");
 
             try {
                 await fetch(SCRIPT_URL, {
@@ -210,14 +241,15 @@
                     body: JSON.stringify(podaci)
                 });
 
-                prikaziStatus("Uspešno popisano!", "success");
+                prikaziStatus("Upisano: " + kod, "success");
 
-                // Reset polja (osim lokacije, nju možda želiš da zadržiš za sledeći unos?)
-                document.getElementById('naziv').value = '';
+                // RESET FORME ZA SLEDEĆI UNOS
+                document.getElementById('kod').value = '';
                 document.getElementById('kolicina').value = '';
                 document.getElementById('napomena').value = '';
-                // Ako hoćeš da resetuješ i lokaciju, otkomentariši sledeću liniju:
-                // document.getElementById('lokacija').value = '';
+                
+                // Vrati kursor na KOD da možeš odmah da skeniraš sledeći
+                document.getElementById('kod').focus();
 
             } catch (error) {
                 console.error("Greška:", error);
@@ -235,5 +267,6 @@
 
 </body>
 </html>
+
 
 
