@@ -3,11 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="manifest" href="manifest.json">
+    
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#ffffff">
+    <link rel="manifest" href="manifest.json">
+    
     <title>Fritz Popis</title>
     
     <link rel="icon" type="image/jpeg" href="https://i.postimg.cc/hvYhRsLJ/01_Wide_version_for_white_background.jpg">
@@ -36,22 +42,9 @@
             justify-content: space-between;
         }
 
-        .logo-container {
-            display: flex;
-            align-items: center;
-        }
-
-        .logo {
-            height: 35px;
-            width: auto;
-            margin-right: 10px;
-        }
-
-        h1 {
-            font-size: 1.2rem;
-            margin: 0;
-            color: #24292e;
-        }
+        .logo-container { display: flex; align-items: center; }
+        .logo { height: 35px; width: auto; margin-right: 10px; }
+        h1 { font-size: 1.2rem; margin: 0; color: #24292e; }
 
         /* DUGMIĆI ZA PROMENU MODA */
         .mode-switch {
@@ -59,7 +52,7 @@
             background: #e1e4e8;
             border-radius: 8px;
             padding: 4px;
-            margin: 15px 20px 0 20px; /* Malo odvojeno od headera */
+            margin: 15px 20px 0 20px;
         }
 
         .mode-btn {
@@ -99,10 +92,9 @@
             max-width: 500px;
         }
 
-        /* KAMERA KONTEJNER (Sakriven po defaultu) */
         #reader {
             width: 100%;
-            display: none; /* Sakriveno dok se ne izabere mobilni mod */
+            display: none;
             margin-bottom: 20px;
             border-radius: 8px;
             overflow: hidden;
@@ -121,12 +113,12 @@
 
         input, select, textarea {
             width: 100%;
-            padding: 12px; /* Malo veći padding za prste */
+            padding: 12px;
             border: 1px solid #d1d5da;
             border-radius: 6px;
             font-size: 1rem;
             box-sizing: border-box;
-            background-color: white;
+            background-color: white; /* Default boja */
         }
 
         input:focus, select:focus, textarea:focus {
@@ -135,7 +127,6 @@
             box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.3);
         }
 
-        /* Zeleno dugme */
         button.btn-primary {
             background-color: #2ea44f;
             color: white;
@@ -161,6 +152,15 @@
         }
         .success { background-color: #dcffe4; color: #1a7f37; border: 1px solid #bef5cb; }
         .error { background-color: #ffebe9; color: #cf222e; border: 1px solid #ffc1bc; }
+
+        /* NOVO: Verzija na dnu */
+        .app-version {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #999;
+            margin-top: 20px;
+            padding-bottom: 10px;
+        }
 
     </style>
 </head>
@@ -210,6 +210,8 @@
 
             <button class="btn-primary" onclick="saveData()">Sačuvaj Unos</button>
             <div id="statusMessage"></div>
+            
+            <div class="app-version">v2.1 (Anti-Double-Click)</div>
         </div>
     </main>
 
@@ -219,7 +221,7 @@
         let html5QrcodeScanner = null;
         let currentMode = 'skener';
         
-        // --- NOVO: Zastavica koja sprečava dupli upis ---
+        // --- Zastavica koja sprečava dupli upis ---
         let isSubmitting = false; 
 
         window.onload = function() {
@@ -229,9 +231,8 @@
 
         // === ENTER LOGIKA ===
         document.addEventListener('keydown', function(event) {
-            // Ako je slanje u toku, ignoriši BILO KAKAV taster (Enter, kucanje...)
             if (isSubmitting) {
-                event.preventDefault();
+                event.preventDefault(); // Ako se šalje, blokiraj sve
                 return;
             }
 
@@ -241,7 +242,6 @@
                 if (aktivnoPolje.id === 'kod') {
                     event.preventDefault();
                     if (document.getElementById('kod').value.trim() === "") return;
-                    
                     const poljeKolicina = document.getElementById('kolicina');
                     poljeKolicina.focus();
                     poljeKolicina.select(); 
@@ -255,8 +255,7 @@
 
         // === GLAVNA FUNKCIJA ČUVANJA ===
         async function saveData() {
-            // 1. BEZBEDNOSNA PROVERA: Ako već šaljem, beži napolje!
-            if (isSubmitting) return;
+            if (isSubmitting) return; // Stop ako već šaljemo
 
             const lokacija = document.getElementById('lokacija').value;
             const kod = document.getElementById('kod').value;
@@ -267,9 +266,9 @@
             if (!kod) { prikaziStatus("Fali bar-kod!", "error"); document.getElementById('kod').focus(); return; }
             if (!kolicina) { prikaziStatus("Unesi količinu!", "error"); document.getElementById('kolicina').focus(); return; }
 
-            // 2. ZAKLJUČAVANJE: Dižemo zastavicu i blokiramo polja
+            // 1. BLOKIRAJ
             isSubmitting = true;
-            toggleInputs(false); // Funkcija koja gasi polja (vidi dole)
+            toggleInputs(false);
 
             const podaci = { lokacija, naziv: kod, kolicina, napomena };
 
@@ -285,7 +284,6 @@
 
                 prikaziStatus("✅ Upisano: " + kod, "success");
                 
-                // Očisti polja
                 document.getElementById('kod').value = '';
                 document.getElementById('kolicina').value = ''; 
                 document.getElementById('napomena').value = '';
@@ -293,35 +291,32 @@
             } catch (error) {
                 sacuvajLokalno(podaci);
                 prikaziStatus("Nema neta. Sačuvano u telefonu.", "error");
-                
-                // I ovde čistimo da bi mogao dalje da radiš
                 document.getElementById('kod').value = '';
                 document.getElementById('kolicina').value = '';
             } finally {
-                // 3. OTKLJUČAVANJE: Bilo uspešno ili ne, ovde završavamo
+                // 2. ODBLOKIRAJ
                 isSubmitting = false;
-                toggleInputs(true); // Pali polja
-                document.getElementById('kod').focus(); // Vrati fokus za novi sken
+                toggleInputs(true);
+                document.getElementById('kod').focus();
             }
         }
 
-        // --- POMOĆNA FUNKCIJA ZA BLOKIRANJE POLJA ---
+        // --- Funkcija za blokiranje polja ---
         function toggleInputs(omoguceno) {
             document.getElementById('kod').disabled = !omoguceno;
             document.getElementById('kolicina').disabled = !omoguceno;
             document.getElementById('napomena').disabled = !omoguceno;
-            // Ako je onemogućeno, promeni boju pozadine da korisnik vidi
             const boja = omoguceno ? 'white' : '#e9ecef';
             document.getElementById('kod').style.backgroundColor = boja;
             document.getElementById('kolicina').style.backgroundColor = boja;
         }
 
-        // === OSTALE FUNKCIJE (Offline, Kamera...) ===
+        // === OSTALO (Offline, Kamera, Sync) ===
         function proveriOfflinePodatke() {
             const offlineData = JSON.parse(localStorage.getItem('offlineSkenovi')) || [];
             const syncDiv = document.getElementById('statusMessage');
-            if (offlineData.length > 0 && (!syncDiv.style.display || syncDiv.style.display === 'none')) {
-                syncDiv.innerHTML = `<div style="background:#fff3cd; color:#856404; padding:10px;">⚠️ Nesačuvano: ${offlineData.length}. <button onclick="sinhronizuj()">Pošalji</button></div>`;
+            if (offlineData.length > 0 && (!syncDiv.style.display || syncDiv.style.display === 'none' || syncDiv.textContent.includes('✅'))) {
+                syncDiv.innerHTML = `<div style="background:#fff3cd; color:#856404; padding:10px;">⚠️ Nesačuvano: ${offlineData.length}. <button onclick="sinhronizuj()" style="margin-left:10px;">Pošalji</button></div>`;
                 syncDiv.style.display = 'block';
             }
         }
@@ -345,8 +340,10 @@
                 await new Promise(r => setTimeout(r, 300));
             }
             localStorage.setItem('offlineSkenovi', JSON.stringify(preostalo));
-            if (preostalo.length === 0) { prikaziStatus("Sve sinhronizovano!", "success"); setTimeout(()=>document.getElementById('statusMessage').style.display='none', 3000); }
-            else { proveriOfflinePodatke(); }
+            if (preostalo.length === 0) { 
+                prikaziStatus("Sve sinhronizovano!", "success"); 
+                setTimeout(()=>document.getElementById('statusMessage').style.display='none', 3000); 
+            } else { proveriOfflinePodatke(); }
         }
 
         function setMode(mode) {
@@ -383,10 +380,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
