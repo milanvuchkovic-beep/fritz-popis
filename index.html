@@ -2,10 +2,18 @@
 <html lang="sr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#ffffff">
     <title>Fritz Popis</title>
     
     <link rel="icon" type="image/jpeg" href="https://i.postimg.cc/hvYhRsLJ/01_Wide_version_for_white_background.jpg">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/hvYhRsLJ/01_Wide_version_for_white_background.jpg">
+
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
         body {
@@ -18,43 +26,87 @@
             min-height: 100vh;
         }
 
+        /* HEADER */
         header {
             background-color: #ffffff;
-            padding: 15px 30px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 10px 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             display: flex;
             align-items: center;
-            border-bottom: 1px solid #e1e4e8;
+            justify-content: space-between;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
         }
 
         .logo {
-            height: 45px;
+            height: 35px;
             width: auto;
-            margin-right: 20px;
+            margin-right: 10px;
         }
 
         h1 {
-            font-size: 1.4rem;
+            font-size: 1.2rem;
             margin: 0;
             color: #24292e;
-            font-weight: 600;
         }
 
+        /* DUGMIĆI ZA PROMENU MODA */
+        .mode-switch {
+            display: flex;
+            background: #e1e4e8;
+            border-radius: 8px;
+            padding: 4px;
+            margin: 15px 20px 0 20px; /* Malo odvojeno od headera */
+        }
+
+        .mode-btn {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #586069;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background-color: white;
+            color: #0366d6;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* GLAVNI DEO */
         main {
             flex: 1;
-            padding: 40px 20px;
+            padding: 20px;
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
+            flex-direction: column;
+            align-items: center;
         }
 
         .card {
             background: white;
-            padding: 30px;
+            padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             width: 100%;
             max-width: 500px;
+        }
+
+        /* KAMERA KONTEJNER (Sakriven po defaultu) */
+        #reader {
+            width: 100%;
+            display: none; /* Sakriveno dok se ne izabere mobilni mod */
+            margin-bottom: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
         }
 
         .form-group { margin-bottom: 15px; }
@@ -67,13 +119,9 @@
             color: #586069;
         }
 
-        /* Stil za inpute i padajući meni (SELECT) */
-        input[type="text"], 
-        input[type="number"],
-        textarea,
-        select { 
+        input, select, textarea {
             width: 100%;
-            padding: 10px;
+            padding: 12px; /* Malo veći padding za prste */
             border: 1px solid #d1d5da;
             border-radius: 6px;
             font-size: 1rem;
@@ -81,88 +129,78 @@
             background-color: white;
         }
 
-        input:focus, textarea:focus, select:focus {
+        input:focus, select:focus, textarea:focus {
             border-color: #0366d6;
             outline: none;
             box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.3);
         }
 
+        /* Zeleno dugme */
         button.btn-primary {
             background-color: #2ea44f;
             color: white;
             border: none;
-            padding: 12px 20px;
+            padding: 15px;
             border-radius: 6px;
-            font-size: 1rem;
+            font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
             width: 100%;
             margin-top: 10px;
         }
+        
+        button.btn-primary:active { background-color: #2c974b; transform: scale(0.98); }
 
-        button.btn-primary:hover { background-color: #2c974b; }
-
+        /* Status poruke */
         #statusMessage {
             margin-top: 15px;
             padding: 10px;
             border-radius: 6px;
             display: none;
+            text-align: center;
         }
         .success { background-color: #dcffe4; color: #1a7f37; border: 1px solid #bef5cb; }
         .error { background-color: #ffebe9; color: #cf222e; border: 1px solid #ffc1bc; }
 
-        /* GitHub Ribbon */
-        .github-corner { position: absolute; top: 0; right: 0; border: 0; z-index: 1000; }
-        .github-corner svg { fill: #24292e; color: #fff; position: absolute; top: 0; border: 0; right: 0; }
-        .github-corner:hover .octo-arm { animation: octocat-wave 560ms ease-in-out; }
-        @keyframes octocat-wave {
-            0%, 100% { transform: rotate(0); }
-            20%, 60% { transform: rotate(-25deg); }
-            40%, 80% { transform: rotate(10deg); }
-        }
-        @media (max-width: 500px) {
-            .github-corner:hover .octo-arm { animation: none; }
-            .github-corner .octo-arm { animation: octocat-wave 560ms ease-in-out; }
-        }
     </style>
 </head>
 <body>
 
-    <a href="https://github.com/" class="github-corner" aria-label="View source on GitHub" target="_blank">
-        <svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true">
-            <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
-            <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path>
-            <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path>
-        </svg>
-    </a>
-
     <header>
-        <img src="https://i.postimg.cc/hvYhRsLJ/01_Wide_version_for_white_background.jpg" alt="Fritz Logo" class="logo">
-        <h1>Fritz Popis</h1>
+        <div class="logo-container">
+            <img src="https://i.postimg.cc/hvYhRsLJ/01_Wide_version_for_white_background.jpg" alt="Logo" class="logo">
+            <h1>Fritz Popis</h1>
+        </div>
     </header>
 
-<main>
+    <div class="mode-switch">
+        <button class="mode-btn" id="btn-mobilni" onclick="setMode('mobilni')">📷 Mobilni</button>
+        <button class="mode-btn active" id="btn-skener" onclick="setMode('skener')">🔫 Skener</button>
+    </div>
+
+    <main>
         <div class="card">
-            <h2>Fritz Popis</h2>
-            
+            <div id="reader"></div>
+
             <div class="form-group">
                 <label for="lokacija">Lokacija:</label>
                 <select id="lokacija">
                     <option value="" disabled selected>-- Izaberi lokaciju --</option>
                     <option value="Magacin 1">Magacin 1</option>
+                    <option value="Magacin 2">Magacin 2</option>
                     <option value="Proizvodnja">Proizvodnja</option>
                     <option value="Dvorište">Dvorište</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="kod">Skeniraj Kod:</label>
-                <input type="text" id="kod" placeholder="Skeniraj ovde..." autofocus>
+                <label for="kod">Bar-kod:</label>
+                <input type="text" id="kod" placeholder="Skeniraj..." autocomplete="off">
             </div>
 
             <div class="form-group">
                 <label for="kolicina">Količina:</label>
-                <input type="number" id="kolicina" placeholder="Ukucaj količinu">
+                <input type="number" id="kolicina" placeholder="Količina">
             </div>
 
             <div class="form-group">
@@ -176,57 +214,119 @@
     </main>
 
     <script>
-        // Postavi kursor u polje KOD čim se stranica učita
+        // === PODEŠAVANJA ===
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8coit4C-MckbtGspSJ0QtMboldH0BrGzsAa5oknFyuQ1c_Grufk4S_zyfQ8xjGf0lOQ/exec'; 
+        let html5QrcodeScanner = null;
+        let currentMode = 'skener';
+
+        // === INICIJALIZACIJA ===
         window.onload = function() {
+            // Po defaultu smo u skener modu
             document.getElementById("kod").focus();
         };
 
-        // Osluskivanje ENTER tastera
+        // === PROMENA MODA RADA ===
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Ažuriraj dugmiće
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-' + mode).classList.add('active');
+
+            if (mode === 'mobilni') {
+                document.getElementById('reader').style.display = 'block';
+                pokreniKameru();
+            } else {
+                document.getElementById('reader').style.display = 'none';
+                zaustaviKameru();
+                document.getElementById("kod").focus();
+            }
+        }
+
+        // === LOGIKA ZA KAMERU ===
+        function pokreniKameru() {
+            if (html5QrcodeScanner) return; // Već radi
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, // Zadnja kamera
+                config,
+                onScanSuccess,
+                onScanFailure
+            ).catch(err => {
+                console.error("Greška kamere", err);
+                prikaziStatus("Ne mogu da pristupim kameri. Proveri dozvole.", "error");
+            });
+        }
+
+        function zaustaviKameru() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                    html5QrcodeScanner = null;
+                }).catch(err => console.error(err));
+            }
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            // Uspešan sken kamerom
+            console.log(`Code matched = ${decodedText}`, decodedResult);
+            
+            // Popuni polje
+            document.getElementById('kod').value = decodedText;
+            
+            // Zvučni signal (opciono, browseri nekad blokiraju)
+            // beep(); 
+
+            // Zaustavi kameru da ne skenira isti kod 100 puta
+            // Ili samo pauziraj? Za sada ne prekidamo kameru skroz, ali fokusiramo količinu.
+            // Ako želiš da se kamera ugasi posle skena, otkomentariši liniju ispod:
+            // zaustaviKameru(); setMode('skener'); // Ovo bi vratilo na manuelni mod
+
+            document.getElementById('kolicina').focus();
+            prikaziStatus("Skenirano: " + decodedText, "success");
+        }
+
+        function onScanFailure(error) {
+            // Ignorisanje grešaka dok traži kod, da ne puni konzolu
+        }
+
+        // === LOGIKA ZA ENTER TASTER (ZA SKENER MOD) ===
         document.addEventListener('keydown', function(event) {
-            // Ako je pritisnut Enter
             if (event.key === 'Enter') {
                 const aktivnoPolje = document.activeElement;
-
-                // 1. Ako smo bili u polju KOD -> Prebaci na Količinu
+                
                 if (aktivnoPolje.id === 'kod') {
-                    event.preventDefault(); // Spreči da forma poludi
+                    event.preventDefault();
                     document.getElementById('kolicina').focus();
-                }
-                // 2. Ako smo bili u polju KOLIČINA -> Sačuvaj podatke
-                else if (aktivnoPolje.id === 'kolicina') {
+                } else if (aktivnoPolje.id === 'kolicina') {
                     event.preventDefault();
                     saveData();
                 }
             }
         });
 
+        // === SLANJE PODATAKA ===
         async function saveData() {
-            const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8coit4C-MckbtGspSJ0QtMboldH0BrGzsAa5oknFyuQ1c_Grufk4S_zyfQ8xjGf0lOQ/exec'; 
-
             const lokacija = document.getElementById('lokacija').value;
-            const kod = document.getElementById('kod').value; // Promenjeno u kod
+            const kod = document.getElementById('kod').value;
             const kolicina = document.getElementById('kolicina').value;
             const napomena = document.getElementById('napomena').value;
 
-            // Validacija
-            if (!lokacija) {
-                prikaziStatus("Izaberi lokaciju!", "error");
-                return;
-            }
-            if (!kod) {
-                prikaziStatus("Fali bar-kod!", "error");
-                document.getElementById('kod').focus();
-                return;
-            }
-            if (!kolicina) {
-                prikaziStatus("Unesi količinu!", "error");
-                document.getElementById('kolicina').focus();
-                return;
-            }
+            if (!lokacija) { prikaziStatus("Izaberi lokaciju!", "error"); return; }
+            if (!kod) { prikaziStatus("Fali bar-kod!", "error"); document.getElementById('kod').focus(); return; }
+            if (!kolicina) { prikaziStatus("Unesi količinu!", "error"); document.getElementById('kolicina').focus(); return; }
 
             const podaci = {
                 lokacija: lokacija,
-                naziv: kod, // Šaljemo kod kao 'naziv' da ne menjamo App Script
+                naziv: kod,
                 kolicina: kolicina,
                 napomena: napomena
             };
@@ -243,16 +343,20 @@
 
                 prikaziStatus("Upisano: " + kod, "success");
 
-                // RESET FORME ZA SLEDEĆI UNOS
+                // Reset
                 document.getElementById('kod').value = '';
                 document.getElementById('kolicina').value = '';
                 document.getElementById('napomena').value = '';
-                
-                // Vrati kursor na KOD da možeš odmah da skeniraš sledeći
-                document.getElementById('kod').focus();
+
+                // Gde se vraća fokus zavisi od moda
+                if (currentMode === 'skener') {
+                    document.getElementById('kod').focus();
+                } else {
+                    // Ako je kamera, ona i dalje radi, samo čekamo novi kod
+                    document.getElementById('kod').placeholder = "Skeniraj sledeći...";
+                }
 
             } catch (error) {
-                console.error("Greška:", error);
                 prikaziStatus("Greška: " + error.message, "error");
             }
         }
@@ -264,9 +368,5 @@
             statusDiv.style.display = 'block';
         }
     </script>
-
 </body>
 </html>
-
-
-
