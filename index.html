@@ -218,64 +218,62 @@
         
         let html5QrcodeScanner = null;
         let currentMode = 'skener';
+        
+        // --- NOVO: Zastavica koja sprečava dupli upis ---
+        let isSubmitting = false; 
 
         window.onload = function() {
             document.getElementById("kod").focus();
             proveriOfflinePodatke(); 
         };
 
-        // === KLJUČNI DEO: KONTROLA ENTER TASTERA ===
+        // === ENTER LOGIKA ===
         document.addEventListener('keydown', function(event) {
-            // Hvatamo Enter (kod 13)
+            // Ako je slanje u toku, ignoriši BILO KAKAV taster (Enter, kucanje...)
+            if (isSubmitting) {
+                event.preventDefault();
+                return;
+            }
+
             if (event.key === 'Enter' || event.keyCode === 13) {
                 const aktivnoPolje = document.activeElement;
                 
-                // 1. Ako smo u polju KOD (Skener je završio)
                 if (aktivnoPolje.id === 'kod') {
-                    event.preventDefault(); // Stopiramo da ne osveži stranu
-                    
-                    // Ako je polje prazno, ne radi ništa
+                    event.preventDefault();
                     if (document.getElementById('kod').value.trim() === "") return;
-
-                    // Prebaci fokus na KOLIČINU
+                    
                     const poljeKolicina = document.getElementById('kolicina');
                     poljeKolicina.focus();
-                    poljeKolicina.select(); // Označi broj da ga lako prepišeš
+                    poljeKolicina.select(); 
                 } 
-                
-                // 2. Ako smo u polju KOLIČINA (Kucao si broj i lupio Enter)
                 else if (aktivnoPolje.id === 'kolicina') {
                     event.preventDefault();
-                    // Simuliramo klik na dugme "Sačuvaj"
                     saveData();
                 }
             }
         });
 
-        // === OSTALE FUNKCIJE (OFFLINE, KAMERA, SAVE) ===
-        
-        function proveriOfflinePodatke() {
-            const offlineData = JSON.parse(localStorage.getItem('offlineSkenovi')) || [];
-            const syncDiv = document.getElementById('statusMessage');
-            if (offlineData.length > 0 && (!syncDiv.style.display || syncDiv.style.display === 'none')) {
-                syncDiv.innerHTML = `<div style="background:#fff3cd; color:#856404; padding:10px;">⚠️ Nesačuvano: ${offlineData.length}. <button onclick="sinhronizuj()">Pošalji</button></div>`;
-                syncDiv.style.display = 'block';
-            }
-        }
-
+        // === GLAVNA FUNKCIJA ČUVANJA ===
         async function saveData() {
+            // 1. BEZBEDNOSNA PROVERA: Ako već šaljem, beži napolje!
+            if (isSubmitting) return;
+
             const lokacija = document.getElementById('lokacija').value;
             const kod = document.getElementById('kod').value;
             const kolicina = document.getElementById('kolicina').value;
             const napomena = document.getElementById('napomena').value;
 
-            if (!lokacija) { prikaziStatus("Gde se nalaziš? Izaberi lokaciju!", "error"); return; }
+            if (!lokacija) { prikaziStatus("Izaberi lokaciju!", "error"); return; }
             if (!kod) { prikaziStatus("Fali bar-kod!", "error"); document.getElementById('kod').focus(); return; }
             if (!kolicina) { prikaziStatus("Unesi količinu!", "error"); document.getElementById('kolicina').focus(); return; }
 
+            // 2. ZAKLJUČAVANJE: Dižemo zastavicu i blokiramo polja
+            isSubmitting = true;
+            toggleInputs(false); // Funkcija koja gasi polja (vidi dole)
+
             const podaci = { lokacija, naziv: kod, kolicina, napomena };
 
-            prikaziStatus("⏳ Čuvanje...", "success");
+            prikaziStatus("⏳ Slanje...", "success");
 
             try {
                 await fetch(SCRIPT_URL, {
@@ -285,23 +283,46 @@
                     body: JSON.stringify(podaci)
                 });
 
-                // USPEH - Zvučni signal ili vizuelni
                 prikaziStatus("✅ Upisano: " + kod, "success");
                 
-                // Resetuj i vrati na početak za NOVI SKEN
+                // Očisti polja
                 document.getElementById('kod').value = '';
                 document.getElementById('kolicina').value = ''; 
                 document.getElementById('napomena').value = '';
-                
-                // VRAĆANJE FOKUSA NA KOD (Spremno za skener)
-                document.getElementById('kod').focus();
 
             } catch (error) {
                 sacuvajLokalno(podaci);
                 prikaziStatus("Nema neta. Sačuvano u telefonu.", "error");
+                
+                // I ovde čistimo da bi mogao dalje da radiš
                 document.getElementById('kod').value = '';
                 document.getElementById('kolicina').value = '';
-                document.getElementById('kod').focus();
+            } finally {
+                // 3. OTKLJUČAVANJE: Bilo uspešno ili ne, ovde završavamo
+                isSubmitting = false;
+                toggleInputs(true); // Pali polja
+                document.getElementById('kod').focus(); // Vrati fokus za novi sken
+            }
+        }
+
+        // --- POMOĆNA FUNKCIJA ZA BLOKIRANJE POLJA ---
+        function toggleInputs(omoguceno) {
+            document.getElementById('kod').disabled = !omoguceno;
+            document.getElementById('kolicina').disabled = !omoguceno;
+            document.getElementById('napomena').disabled = !omoguceno;
+            // Ako je onemogućeno, promeni boju pozadine da korisnik vidi
+            const boja = omoguceno ? 'white' : '#e9ecef';
+            document.getElementById('kod').style.backgroundColor = boja;
+            document.getElementById('kolicina').style.backgroundColor = boja;
+        }
+
+        // === OSTALE FUNKCIJE (Offline, Kamera...) ===
+        function proveriOfflinePodatke() {
+            const offlineData = JSON.parse(localStorage.getItem('offlineSkenovi')) || [];
+            const syncDiv = document.getElementById('statusMessage');
+            if (offlineData.length > 0 && (!syncDiv.style.display || syncDiv.style.display === 'none')) {
+                syncDiv.innerHTML = `<div style="background:#fff3cd; color:#856404; padding:10px;">⚠️ Nesačuvano: ${offlineData.length}. <button onclick="sinhronizuj()">Pošalji</button></div>`;
+                syncDiv.style.display = 'block';
             }
         }
 
@@ -354,7 +375,6 @@
             const statusDiv = document.getElementById('statusMessage');
             if (tip === 'success') {
                 statusDiv.innerHTML = `<div class="${tip}" style="font-weight:bold; font-size:1.2em;">${poruka}</div>`;
-                // Ne briši odmah ako je sinhronizacija u toku, ali za običan save može
             } else {
                 statusDiv.innerHTML = `<div class="${tip}">${poruka}</div>`;
             }
@@ -363,6 +383,7 @@
     </script>
 </body>
 </html>
+
 
 
 
