@@ -1,0 +1,21 @@
+{
+  "name": "Fritz Popis",
+  "short_name": "Fritz",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "https://i.postimg.cc/hvYhRsLJ/01_Wide_version_for_white_background.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "https://i.postimg.cc/hvYhRsLJ/01_Wide_version_for_white_background.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
