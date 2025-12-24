@@ -214,56 +214,94 @@
     </main>
 
     <script>
-        // === PODEŠAVANJA ===
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8coit4C-MckbtGspSJ0QtMboldH0BrGzsAa5oknFyuQ1c_Grufk4S_zyfQ8xjGf0lOQ/exec'; 
         
         let html5QrcodeScanner = null;
         let currentMode = 'skener';
 
-        // === INICIJALIZACIJA ===
         window.onload = function() {
             document.getElementById("kod").focus();
             proveriOfflinePodatke(); 
         };
 
-        // === 1. GLAVNA POPRAVKA: ENTER LOGIKA (SKENER) ===
-        // Ovo mora biti na vrhu da uhvati signal skenera odmah
+        // === KLJUČNI DEO: KONTROLA ENTER TASTERA ===
         document.addEventListener('keydown', function(event) {
-            // Provera da li je Enter (neki uređaji šalju 13, neki "Enter")
+            // Hvatamo Enter (kod 13)
             if (event.key === 'Enter' || event.keyCode === 13) {
                 const aktivnoPolje = document.activeElement;
                 
-                // A) Ako smo u polju KOD (skener je upravo završio)
+                // 1. Ako smo u polju KOD (Skener je završio)
                 if (aktivnoPolje.id === 'kod') {
-                    event.preventDefault(); // Spreči standardno ponašanje
+                    event.preventDefault(); // Stopiramo da ne osveži stranu
                     
-                    // Prebaci na količinu
+                    // Ako je polje prazno, ne radi ništa
+                    if (document.getElementById('kod').value.trim() === "") return;
+
+                    // Prebaci fokus na KOLIČINU
                     const poljeKolicina = document.getElementById('kolicina');
                     poljeKolicina.focus();
-                    poljeKolicina.select(); // Označi tekst da odmah možeš da kucaš preko
+                    poljeKolicina.select(); // Označi broj da ga lako prepišeš
                 } 
-                // B) Ako smo u polju KOLIČINA (korisnik je ukucao broj i lupio Enter)
+                
+                // 2. Ako smo u polju KOLIČINA (Kucao si broj i lupio Enter)
                 else if (aktivnoPolje.id === 'kolicina') {
                     event.preventDefault();
-                    saveData(); // Šalji podatke
+                    // Simuliramo klik na dugme "Sačuvaj"
+                    saveData();
                 }
             }
         });
 
-        // === 2. OFFLINE LOGIKA (PADOBRAN) ===
+        // === OSTALE FUNKCIJE (OFFLINE, KAMERA, SAVE) ===
+        
         function proveriOfflinePodatke() {
             const offlineData = JSON.parse(localStorage.getItem('offlineSkenovi')) || [];
             const syncDiv = document.getElementById('statusMessage');
-            
-            // Ako ima podataka, a ne prikazujemo trenutno poruku o uspehu/grešci
-            if (offlineData.length > 0 && (!syncDiv.style.display || syncDiv.style.display === 'none' || syncDiv.textContent.includes('nesačuvana'))) {
-                syncDiv.innerHTML = `
-                    <div style="background:#fff3cd; color:#856404; padding:10px; border:1px solid #ffeeba; margin-bottom:10px;">
-                        ⚠️ Čeka se slanje: ${offlineData.length} stavki.<br>
-                        <button onclick="sinhronizuj()" style="background:#ffc107; border:none; padding:8px 15px; margin-top:5px; border-radius:4px; cursor:pointer; font-weight:bold; width:100%;">📤 Pošalji sad</button>
-                    </div>
-                `;
+            if (offlineData.length > 0 && (!syncDiv.style.display || syncDiv.style.display === 'none')) {
+                syncDiv.innerHTML = `<div style="background:#fff3cd; color:#856404; padding:10px;">⚠️ Nesačuvano: ${offlineData.length}. <button onclick="sinhronizuj()">Pošalji</button></div>`;
                 syncDiv.style.display = 'block';
+            }
+        }
+
+        async function saveData() {
+            const lokacija = document.getElementById('lokacija').value;
+            const kod = document.getElementById('kod').value;
+            const kolicina = document.getElementById('kolicina').value;
+            const napomena = document.getElementById('napomena').value;
+
+            if (!lokacija) { prikaziStatus("Gde se nalaziš? Izaberi lokaciju!", "error"); return; }
+            if (!kod) { prikaziStatus("Fali bar-kod!", "error"); document.getElementById('kod').focus(); return; }
+            if (!kolicina) { prikaziStatus("Unesi količinu!", "error"); document.getElementById('kolicina').focus(); return; }
+
+            const podaci = { lokacija, naziv: kod, kolicina, napomena };
+
+            prikaziStatus("⏳ Čuvanje...", "success");
+
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(podaci)
+                });
+
+                // USPEH - Zvučni signal ili vizuelni
+                prikaziStatus("✅ Upisano: " + kod, "success");
+                
+                // Resetuj i vrati na početak za NOVI SKEN
+                document.getElementById('kod').value = '';
+                document.getElementById('kolicina').value = ''; 
+                document.getElementById('napomena').value = '';
+                
+                // VRAĆANJE FOKUSA NA KOD (Spremno za skener)
+                document.getElementById('kod').focus();
+
+            } catch (error) {
+                sacuvajLokalno(podaci);
+                prikaziStatus("Nema neta. Sačuvano u telefonu.", "error");
+                document.getElementById('kod').value = '';
+                document.getElementById('kolicina').value = '';
+                document.getElementById('kod').focus();
             }
         }
 
@@ -277,150 +315,46 @@
         async function sinhronizuj() {
             let offlineData = JSON.parse(localStorage.getItem('offlineSkenovi')) || [];
             if (offlineData.length === 0) return;
-
-            const statusDiv = document.getElementById('statusMessage');
-            statusDiv.innerHTML = '<div style="padding:10px; background:#e1f5fe; color:#0277bd;">⏳ Šaljem podatke...</div>';
-
+            prikaziStatus("Šaljem...", "success");
             let preostalo = [];
-            let poslatoCount = 0;
-
             for (let item of offlineData) {
                 try {
-                    await fetch(SCRIPT_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(item)
-                    });
-                    poslatoCount++;
-                } catch (e) {
-                    preostalo.push(item);
-                }
-                // Kratka pauza
+                    await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(item) });
+                } catch (e) { preostalo.push(item); }
                 await new Promise(r => setTimeout(r, 300));
             }
-
             localStorage.setItem('offlineSkenovi', JSON.stringify(preostalo));
-
-            if (preostalo.length === 0) {
-                prikaziStatus("✅ Sve sinhronizovano (" + poslatoCount + ")", "success");
-                setTimeout(() => { 
-                    statusDiv.style.display = 'none'; 
-                }, 3000);
-            } else {
-                proveriOfflinePodatke();
-                // Dodatna poruka
-                const msg = document.createElement('div');
-                msg.textContent = "Neki podaci nisu prošli. Probaj opet.";
-                msg.className = "error";
-                statusDiv.appendChild(msg);
-            }
+            if (preostalo.length === 0) { prikaziStatus("Sve sinhronizovano!", "success"); setTimeout(()=>document.getElementById('statusMessage').style.display='none', 3000); }
+            else { proveriOfflinePodatke(); }
         }
 
-        // === 3. KAMERA I MOD RADA ===
         function setMode(mode) {
             currentMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('btn-' + mode).classList.add('active');
-
-            if (mode === 'mobilni') {
-                document.getElementById('reader').style.display = 'block';
-                pokreniKameru();
-            } else {
-                document.getElementById('reader').style.display = 'none';
-                zaustaviKameru();
-                document.getElementById("kod").focus();
-            }
+            if (mode === 'mobilni') { document.getElementById('reader').style.display = 'block'; pokreniKameru(); }
+            else { document.getElementById('reader').style.display = 'none'; zaustaviKameru(); document.getElementById("kod").focus(); }
         }
 
         function pokreniKameru() {
             if (html5QrcodeScanner) return;
             html5QrcodeScanner = new Html5Qrcode("reader");
-            // Univerzalna konfiguracija za sve kodove
-            const config = { fps: 10, qrbox: { width: 300, height: 200 }, aspectRatio: 1.0 };
-            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
-                .catch(err => {
-                    console.error(err);
-                    prikaziStatus("Kamera nije dostupna.", "error");
-                });
+            const config = { fps: 10, qrbox: { width: 300, height: 150 }, aspectRatio: 1.0 };
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure);
         }
-
-        function zaustaviKameru() {
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.stop().then(() => {
-                    html5QrcodeScanner.clear();
-                    html5QrcodeScanner = null;
-                }).catch(err => console.error(err));
-            }
-        }
-
+        function zaustaviKameru() { if (html5QrcodeScanner) { html5QrcodeScanner.stop().then(() => { html5QrcodeScanner.clear(); html5QrcodeScanner = null; }); } }
+        
         function onScanSuccess(decodedText) {
             document.getElementById('kod').value = decodedText;
             document.getElementById('kolicina').focus();
-            // Ovde namerno ne prekidamo kameru da bi radnik mogao brzo da skenira sledeći
         }
         function onScanFailure(error) {}
 
-        // === 4. SLANJE (SAVE) ===
-        async function saveData() {
-            const lokacija = document.getElementById('lokacija').value;
-            const kod = document.getElementById('kod').value;
-            const kolicina = document.getElementById('kolicina').value;
-            const napomena = document.getElementById('napomena').value;
-
-            if (!lokacija) { prikaziStatus("Izaberi lokaciju!", "error"); return; }
-            if (!kod) { prikaziStatus("Fali bar-kod!", "error"); document.getElementById('kod').focus(); return; }
-            if (!kolicina) { prikaziStatus("Unesi količinu!", "error"); document.getElementById('kolicina').focus(); return; }
-
-            const podaci = {
-                lokacija: lokacija,
-                naziv: kod,
-                kolicina: kolicina,
-                napomena: napomena
-            };
-
-            prikaziStatus("Šaljem...", "success");
-
-            try {
-                // Pokušaj online slanja
-                await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(podaci)
-                });
-
-                prikaziStatus("Upisano: " + kod, "success");
-                resetujFormu();
-
-            } catch (error) {
-                // Ako pukne net
-                console.error("Greška mreže, čuvam lokalno");
-                sacuvajLokalno(podaci);
-                prikaziStatus("Nema interneta! Sačuvano u telefonu.", "error");
-                resetujFormu();
-            }
-        }
-
-        function resetujFormu() {
-            document.getElementById('kod').value = '';
-            document.getElementById('kolicina').value = '';
-            document.getElementById('napomena').value = '';
-
-            if (currentMode === 'skener') {
-                document.getElementById('kod').focus();
-            } else {
-                document.getElementById('kod').placeholder = "Skeniraj sledeći...";
-            }
-        }
-
         function prikaziStatus(poruka, tip) {
             const statusDiv = document.getElementById('statusMessage');
-            // Ako je uspeh, samo kratko prikaži, ali ne briši dugme za sync ako postoji
             if (tip === 'success') {
-                statusDiv.innerHTML = `<div class="${tip}">${poruka}</div>`;
-                // Vrati dugme za sync posle 2 sekunde ako ima podataka
-                setTimeout(proveriOfflinePodatke, 2000); 
+                statusDiv.innerHTML = `<div class="${tip}" style="font-weight:bold; font-size:1.2em;">${poruka}</div>`;
+                // Ne briši odmah ako je sinhronizacija u toku, ali za običan save može
             } else {
                 statusDiv.innerHTML = `<div class="${tip}">${poruka}</div>`;
             }
@@ -429,6 +363,7 @@
     </script>
 </body>
 </html>
+
 
 
 
