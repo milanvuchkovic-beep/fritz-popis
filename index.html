@@ -223,20 +223,44 @@
         // === INICIJALIZACIJA ===
         window.onload = function() {
             document.getElementById("kod").focus();
-            proveriOfflinePodatke(); // Proveri da li ima nešto zaostalo
+            proveriOfflinePodatke(); 
         };
 
-        // === OFFLINE LOGIKA (PADOBRAN) ===
+        // === 1. GLAVNA POPRAVKA: ENTER LOGIKA (SKENER) ===
+        // Ovo mora biti na vrhu da uhvati signal skenera odmah
+        document.addEventListener('keydown', function(event) {
+            // Provera da li je Enter (neki uređaji šalju 13, neki "Enter")
+            if (event.key === 'Enter' || event.keyCode === 13) {
+                const aktivnoPolje = document.activeElement;
+                
+                // A) Ako smo u polju KOD (skener je upravo završio)
+                if (aktivnoPolje.id === 'kod') {
+                    event.preventDefault(); // Spreči standardno ponašanje
+                    
+                    // Prebaci na količinu
+                    const poljeKolicina = document.getElementById('kolicina');
+                    poljeKolicina.focus();
+                    poljeKolicina.select(); // Označi tekst da odmah možeš da kucaš preko
+                } 
+                // B) Ako smo u polju KOLIČINA (korisnik je ukucao broj i lupio Enter)
+                else if (aktivnoPolje.id === 'kolicina') {
+                    event.preventDefault();
+                    saveData(); // Šalji podatke
+                }
+            }
+        });
+
+        // === 2. OFFLINE LOGIKA (PADOBRAN) ===
         function proveriOfflinePodatke() {
             const offlineData = JSON.parse(localStorage.getItem('offlineSkenovi')) || [];
             const syncDiv = document.getElementById('statusMessage');
             
-            if (offlineData.length > 0) {
-                // Kreiramo dugme za slanje ako ima zaostalih podataka
+            // Ako ima podataka, a ne prikazujemo trenutno poruku o uspehu/grešci
+            if (offlineData.length > 0 && (!syncDiv.style.display || syncDiv.style.display === 'none' || syncDiv.textContent.includes('nesačuvana'))) {
                 syncDiv.innerHTML = `
                     <div style="background:#fff3cd; color:#856404; padding:10px; border:1px solid #ffeeba; margin-bottom:10px;">
-                        ⚠️ Imaš ${offlineData.length} nesačuvana unosa zbog interneta.<br>
-                        <button onclick="sinhronizuj()" style="background:#ffc107; border:none; padding:5px 10px; margin-top:5px; border-radius:4px; cursor:pointer; font-weight:bold;">📤 Pošalji sad</button>
+                        ⚠️ Čeka se slanje: ${offlineData.length} stavki.<br>
+                        <button onclick="sinhronizuj()" style="background:#ffc107; border:none; padding:8px 15px; margin-top:5px; border-radius:4px; cursor:pointer; font-weight:bold; width:100%;">📤 Pošalji sad</button>
                     </div>
                 `;
                 syncDiv.style.display = 'block';
@@ -254,10 +278,12 @@
             let offlineData = JSON.parse(localStorage.getItem('offlineSkenovi')) || [];
             if (offlineData.length === 0) return;
 
-            prikaziStatus("Šaljem zaostale podatke...", "success");
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.innerHTML = '<div style="padding:10px; background:#e1f5fe; color:#0277bd;">⏳ Šaljem podatke...</div>';
 
-            // Šaljemo jedan po jedan
             let preostalo = [];
+            let poslatoCount = 0;
+
             for (let item of offlineData) {
                 try {
                     await fetch(SCRIPT_URL, {
@@ -266,27 +292,32 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(item)
                     });
-                    // Uspešno, ne dodajemo ga u preostalo
+                    poslatoCount++;
                 } catch (e) {
-                    console.error("I dalje nema neta za ovaj unos");
                     preostalo.push(item);
                 }
-                // Mala pauza da ne udavimo Google
-                await new Promise(r => setTimeout(r, 500));
+                // Kratka pauza
+                await new Promise(r => setTimeout(r, 300));
             }
 
             localStorage.setItem('offlineSkenovi', JSON.stringify(preostalo));
 
             if (preostalo.length === 0) {
-                prikaziStatus("Sve uspešno sinhronizovano! ✅", "success");
-                setTimeout(() => { document.getElementById('statusMessage').style.display = 'none'; }, 3000);
+                prikaziStatus("✅ Sve sinhronizovano (" + poslatoCount + ")", "success");
+                setTimeout(() => { 
+                    statusDiv.style.display = 'none'; 
+                }, 3000);
             } else {
-                proveriOfflinePodatke(); // Opet prikaži dugme za one koji nisu prošli
-                prikaziStatus("Neki podaci nisu prošli. Probaj opet kasnije.", "error");
+                proveriOfflinePodatke();
+                // Dodatna poruka
+                const msg = document.createElement('div');
+                msg.textContent = "Neki podaci nisu prošli. Probaj opet.";
+                msg.className = "error";
+                statusDiv.appendChild(msg);
             }
         }
 
-        // === PROMENA MODA RADA ===
+        // === 3. KAMERA I MOD RADA ===
         function setMode(mode) {
             currentMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -302,19 +333,15 @@
             }
         }
 
-        // === LOGIKA ZA KAMERU (UNIVERZALNA) ===
         function pokreniKameru() {
             if (html5QrcodeScanner) return;
             html5QrcodeScanner = new Html5Qrcode("reader");
-            const config = { 
-                fps: 10, 
-                qrbox: { width: 300, height: 200 }, 
-                aspectRatio: 1.0
-            };
+            // Univerzalna konfiguracija za sve kodove
+            const config = { fps: 10, qrbox: { width: 300, height: 200 }, aspectRatio: 1.0 };
             html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
                 .catch(err => {
-                    console.error("Greška kamere", err);
-                    prikaziStatus("Problem sa kamerom.", "error");
+                    console.error(err);
+                    prikaziStatus("Kamera nije dostupna.", "error");
                 });
         }
 
@@ -330,25 +357,11 @@
         function onScanSuccess(decodedText) {
             document.getElementById('kod').value = decodedText;
             document.getElementById('kolicina').focus();
-            // Ne brišemo status ovde da ne bismo sakrili dugme za sync ako postoji
+            // Ovde namerno ne prekidamo kameru da bi radnik mogao brzo da skenira sledeći
         }
         function onScanFailure(error) {}
 
-        // === ENTER LOGIKA ===
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                const aktivnoPolje = document.activeElement;
-                if (aktivnoPolje.id === 'kod') {
-                    event.preventDefault();
-                    document.getElementById('kolicina').focus();
-                } else if (aktivnoPolje.id === 'kolicina') {
-                    event.preventDefault();
-                    saveData();
-                }
-            }
-        });
-
-        // === GLAVNO ČUVANJE ===
+        // === 4. SLANJE (SAVE) ===
         async function saveData() {
             const lokacija = document.getElementById('lokacija').value;
             const kod = document.getElementById('kod').value;
@@ -369,7 +382,7 @@
             prikaziStatus("Šaljem...", "success");
 
             try {
-                // Pokušaj slanja na Google
+                // Pokušaj online slanja
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors',
@@ -378,15 +391,13 @@
                 });
 
                 prikaziStatus("Upisano: " + kod, "success");
-                
-                // Očisti formu
                 resetujFormu();
 
             } catch (error) {
-                // AKO PUKNE NET -> ČUVAJ LOKALNO
-                console.error("Greška mreže, čuvam lokalno:", error);
+                // Ako pukne net
+                console.error("Greška mreže, čuvam lokalno");
                 sacuvajLokalno(podaci);
-                prikaziStatus("Nema interneta! Sačuvano u telefonu.", "error"); // Tehnički error boja, ali je info
+                prikaziStatus("Nema interneta! Sačuvano u telefonu.", "error");
                 resetujFormu();
             }
         }
@@ -405,23 +416,20 @@
 
         function prikaziStatus(poruka, tip) {
             const statusDiv = document.getElementById('statusMessage');
-            // Ako imamo dugme za sync, ne želimo da ga pregazimo običnom porukom skroz
-            // Ali za sad jednostavno rešenje:
-            if (tip === 'success' && document.getElementById('statusMessage').innerHTML.includes('sinhronizuj')) {
-                // Ako je uspeh, a imamo dugme za sync, ne diraj dugme, samo dodaj poruku ispod ili ignoriši
-                return; 
+            // Ako je uspeh, samo kratko prikaži, ali ne briši dugme za sync ako postoji
+            if (tip === 'success') {
+                statusDiv.innerHTML = `<div class="${tip}">${poruka}</div>`;
+                // Vrati dugme za sync posle 2 sekunde ako ima podataka
+                setTimeout(proveriOfflinePodatke, 2000); 
+            } else {
+                statusDiv.innerHTML = `<div class="${tip}">${poruka}</div>`;
             }
-            
-            statusDiv.textContent = poruka;
-            statusDiv.className = tip;
             statusDiv.style.display = 'block';
-            
-            // Ponovo proveri da li treba vratiti dugme za sync posle poruke
-            setTimeout(proveriOfflinePodatke, 2000);
         }
     </script>
 </body>
 </html>
+
 
 
 
