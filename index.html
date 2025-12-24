@@ -215,13 +215,14 @@
 
     <script>
         // === PODEŠAVANJA ===
+        // ZALEPI SVOJ LINK DOLE
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8coit4C-MckbtGspSJ0QtMboldH0BrGzsAa5oknFyuQ1c_Grufk4S_zyfQ8xjGf0lOQ/exec'; 
+        
         let html5QrcodeScanner = null;
         let currentMode = 'skener';
 
         // === INICIJALIZACIJA ===
         window.onload = function() {
-            // Po defaultu smo u skener modu
             document.getElementById("kod").focus();
         };
 
@@ -229,7 +230,6 @@
         function setMode(mode) {
             currentMode = mode;
             
-            // Ažuriraj dugmiće
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('btn-' + mode).classList.add('active');
 
@@ -243,26 +243,38 @@
             }
         }
 
-        // === LOGIKA ZA KAMERU ===
+        // === LOGIKA ZA KAMERU (PODESENO ZA BAR-KODOVE) ===
         function pokreniKameru() {
-            if (html5QrcodeScanner) return; // Već radi
+            if (html5QrcodeScanner) return;
+
+            // Ovde definišemo koje kodove tražimo.
+            // CODE_128 je najčešći u industriji/magacinima.
+            // EAN_13 je onaj na proizvodima u prodavnici.
+            const formatsToSupport = [
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.UPC_A
+            ];
 
             html5QrcodeScanner = new Html5Qrcode("reader");
             
             const config = { 
                 fps: 10, 
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
+                // BITNO: Pravimo pravougaonik umesto kvadrata da lakše uhvati bar-kod
+                qrbox: { width: 300, height: 150 }, 
+                aspectRatio: 1.0,
+                formatsToSupport: formatsToSupport
             };
 
             html5QrcodeScanner.start(
-                { facingMode: "environment" }, // Zadnja kamera
+                { facingMode: "environment" }, 
                 config,
                 onScanSuccess,
                 onScanFailure
             ).catch(err => {
                 console.error("Greška kamere", err);
-                prikaziStatus("Ne mogu da pristupim kameri. Proveri dozvole.", "error");
+                prikaziStatus("Problem sa kamerom. Proveri dozvole.", "error");
             });
         }
 
@@ -276,29 +288,26 @@
         }
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Uspešan sken kamerom
             console.log(`Code matched = ${decodedText}`, decodedResult);
             
-            // Popuni polje
+            // Uspešan sken!
             document.getElementById('kod').value = decodedText;
             
-            // Zvučni signal (opciono, browseri nekad blokiraju)
-            // beep(); 
-
-            // Zaustavi kameru da ne skenira isti kod 100 puta
-            // Ili samo pauziraj? Za sada ne prekidamo kameru skroz, ali fokusiramo količinu.
-            // Ako želiš da se kamera ugasi posle skena, otkomentariši liniju ispod:
-            // zaustaviKameru(); setMode('skener'); // Ovo bi vratilo na manuelni mod
-
+            // Opcija: Možeš da dodaš zvuk ovde ako želiš (beep)
+            
+            // Prebaci fokus na količinu
             document.getElementById('kolicina').focus();
             prikaziStatus("Skenirano: " + decodedText, "success");
+            
+            // Opciono: Ako želiš da se kamera ugasi posle uspešnog skena:
+            // setMode('skener'); 
         }
 
         function onScanFailure(error) {
-            // Ignorisanje grešaka dok traži kod, da ne puni konzolu
+            // Ignorišemo greške pri traženju
         }
 
-        // === LOGIKA ZA ENTER TASTER (ZA SKENER MOD) ===
+        // === ENTER LOGIKA (ZA FIZIČKI SKENER) ===
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
                 const aktivnoPolje = document.activeElement;
@@ -343,16 +352,13 @@
 
                 prikaziStatus("Upisano: " + kod, "success");
 
-                // Reset
                 document.getElementById('kod').value = '';
                 document.getElementById('kolicina').value = '';
                 document.getElementById('napomena').value = '';
 
-                // Gde se vraća fokus zavisi od moda
                 if (currentMode === 'skener') {
                     document.getElementById('kod').focus();
                 } else {
-                    // Ako je kamera, ona i dalje radi, samo čekamo novi kod
                     document.getElementById('kod').placeholder = "Skeniraj sledeći...";
                 }
 
@@ -370,3 +376,4 @@
     </script>
 </body>
 </html>
+
